@@ -748,37 +748,7 @@ filter_and_confirm_ports() {
         echo -e "${YELLOW}端口跳跃可以将一个端口范围转发到单个目标端口${RESET}"
         read -r response
         if [[ "$response" =~ ^[Yy]([eE][sS])?$ ]]; then
-            # 首先尝试智能生成建议
-            auto_generate_port_hopping_suggestions
-            
-            # 然后提供手动添加选项
-            if [ ${#NAT_RULES[@]} -eq 0 ]; then
-                echo -e "\n${CYAN}没有自动生成建议，是否手动配置端口跳跃规则? [y/N]${RESET}"
-                read -r manual_response
-                if [[ "$manual_response" =~ ^[Yy]([eE][sS])?$ ]]; then
-                    add_port_range_interactive
-                fi
-            else
-                echo -e "\n${CYAN}是否还需要手动添加更多端口跳跃规则? [y/N]${RESET}"
-                read -r additional_response
-                if [[ "$additional_response" =~ ^[Yy]([eE][sS])?$ ]]; then
-                    add_port_range_interactive
-                fi
-            fi
-        fi
-    elif [ "$DRY_RUN" = false ] && [ ${#NAT_RULES[@]} -gt 0 ]; then
-        # 如果已有端口跳跃规则，询问是否添加更多
-        echo -e "\n${CYAN}🔄 检测到现有端口跳跃规则，是否需要添加更多? [y/N]${RESET}"
-        read -r response
-        if [[ "$response" =~ ^[Yy]([eE][sS])?$ ]]; then
-            # 尝试智能补充建议
-            auto_generate_port_hopping_suggestions
-            
-            echo -e "\n${CYAN}是否手动添加端口跳跃规则? [y/N]${RESET}"
-            read -r manual_response
-            if [[ "$manual_response" =~ ^[Yy]([eE][sS])?$ ]]; then
-                add_port_range_interactive
-            fi
+            add_port_range_interactive
         fi
     fi
     
