@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Color definitions
+# 颜色定义
 GREEN="\033[32m"
 YELLOW="\033[33m"
 RED="\033[31m"
@@ -9,21 +9,21 @@ BLUE="\033[34m"
 CYAN="\033[36m"
 RESET="\033[0m"
 
-# Script information
-SCRIPT_VERSION="2.0.2"
-SCRIPT_NAME="Precise Proxy Port Firewall Management Script (iptables version)"
+# 脚本信息
+SCRIPT_VERSION="2.0.3"
+SCRIPT_NAME="精确代理端口防火墙管理脚本（iptables 版本）"
 
 echo -e "${YELLOW}== 🚀 ${SCRIPT_NAME} v${SCRIPT_VERSION} ==${RESET}"
-echo -e "${CYAN}Optimized for Hiddify, 3X-UI, X-UI, Sing-box, Xray and other proxy panels${RESET}"
-echo -e "${GREEN}🔧 Using iptables for best compatibility${RESET}"
+echo -e "${CYAN}针对 Hiddify、3X-UI、X-UI、Sing-box、Xray 等代理面板优化${RESET}"
+echo -e "${GREEN}🔧 使用 iptables 实现最佳兼容性${RESET}"
 
-# Permission check
+# 权限检查
 if [ "$(id -u)" != "0" ]; then
-    echo -e "${RED}❌ Root privileges required${RESET}"
+    echo -e "${RED}❌ 需要 root 权限运行此脚本${RESET}"
     exit 1
 fi
 
-# Global variables
+# 全局变量
 DEBUG_MODE=false
 DRY_RUN=false
 SSH_PORT=""
@@ -32,10 +32,10 @@ PORT_RANGES=()
 NAT_RULES=()
 OPENED_PORTS=0
 
-# Default permanent open ports
+# 默认永久开放端口
 DEFAULT_OPEN_PORTS=(80 443)
 
-# Proxy core processes
+# 代理核心进程
 PROXY_CORE_PROCESSES=(
     "xray" "v2ray" "sing-box" "singbox" "sing_box"
     "hysteria" "hysteria2" "tuic" "juicity" "shadowtls"
@@ -46,12 +46,12 @@ PROXY_CORE_PROCESSES=(
     "brook" "gost" "naive" "clash" "clash-meta" "mihomo"
 )
 
-# Web panel processes
+# Web 面板进程
 WEB_PANEL_PROCESSES=(
     "nginx" "caddy" "apache2" "httpd" "haproxy" "envoy"
 )
 
-# Proxy configuration files
+# 代理配置文件
 PROXY_CONFIG_FILES=(
     "/opt/hiddify-manager/hiddify-panel/hiddify_panel/panel/commercial/restapi/v2/admin/admin.py"
     "/opt/hiddify-manager/log/system/hiddify-panel.log"
@@ -72,15 +72,14 @@ PROXY_CONFIG_FILES=(
     "/etc/trojan/config.json"
 )
 
-# Common Hiddify ports
+# Hiddify 常用端口
 HIDDIFY_COMMON_PORTS=(
     "443" "8443" "9443"
     "80" "8080" "8880"
     "2053" "2083" "2087" "2096"
-    "8443" "8880"
 )
 
-# Standard proxy ports
+# 标准代理端口
 STANDARD_PROXY_PORTS=(
     "80" "443" "8080" "8443" "8880" "8888"
     "1080" "1085"
@@ -89,7 +88,7 @@ STANDARD_PROXY_PORTS=(
     "8443" "9443"
 )
 
-# Internal service ports (should not be exposed)
+# 内部服务端口（不应暴露）
 INTERNAL_SERVICE_PORTS=(
     8181 10085 10086 9090 3000 3001 8000 8001
     10080 10081 10082 10083 10084 10085 10086 10087 10088 10089
@@ -98,7 +97,7 @@ INTERNAL_SERVICE_PORTS=(
     8090 8091 8092 8093 8094 8095
 )
 
-# Dangerous port blacklist
+# 危险端口黑名单
 BLACKLIST_PORTS=(
     22 23 25 53 69 111 135 137 138 139 445 514 631
     1433 1521 3306 5432 6379 27017
@@ -107,10 +106,10 @@ BLACKLIST_PORTS=(
     8181 10085 10086
 )
 
-# Helper functions
+# 辅助函数
 debug_log() { 
     if [ "$DEBUG_MODE" = true ]; then 
-        echo -e "${BLUE}[DEBUG] $1${RESET}"
+        echo -e "${BLUE}[调试] $1${RESET}"
     fi
 }
 
@@ -131,7 +130,7 @@ info() {
     echo -e "${CYAN}ℹ️  $1${RESET}"
 }
 
-# String split function
+# 字符串分割函数
 split_nat_rule() {
     local rule="$1"
     local delimiter="$2"
@@ -148,44 +147,44 @@ split_nat_rule() {
     fi
 }
 
-# Show help
+# 显示帮助信息
 show_help() {
     cat << 'EOF'
-Precise Proxy Port Firewall Management Script v2.0.2 (iptables version)
+精确代理端口防火墙管理脚本 v2.0.3（iptables 版本）
 
-Intelligent port management tool designed for modern proxy panels
+为现代代理面板设计的智能端口管理工具
 
-Usage: bash script.sh [options]
+用法: bash script.sh [选项]
 
-Options:
-    --debug           Show detailed debugging information
-    --dry-run         Preview mode, don't actually modify firewall
-    --add-range       Interactive port range addition
-    --reset           Reset firewall to default state
-    --status          Show current firewall status
-    --help, -h        Show this help
+选项:
+    --debug           显示详细调试信息
+    --dry-run         预览模式，不实际修改防火墙
+    --add-range       交互式端口范围添加
+    --reset           重置防火墙到默认状态
+    --status          显示当前防火墙状态
+    --help, -h        显示此帮助信息
 
-Supported proxy panels/software:
+支持的代理面板/软件:
     ✓ Hiddify Manager/Panel
     ✓ 3X-UI / X-UI
     ✓ Xray / V2Ray
     ✓ Sing-box
     ✓ Hysteria / Hysteria2
     ✓ Trojan-Go / Trojan
-    ✓ Shadowsocks series
-    ✓ Other mainstream proxy tools
+    ✓ Shadowsocks 系列
+    ✓ 其他主流代理工具
 
-Security features:
-    ✓ Precise port identification
-    ✓ Automatic internal service port filtering
-    ✓ Dangerous port filtering
-    ✓ SSH brute force protection
-    ✓ Stable iptables-based firewall
+安全功能:
+    ✓ 精确端口识别
+    ✓ 自动过滤内部服务端口
+    ✓ 危险端口过滤
+    ✓ SSH 暴力破解防护
+    ✓ 稳定的 iptables 防火墙
 
 EOF
 }
 
-# Parse arguments
+# 解析参数
 parse_arguments() {
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -195,14 +194,14 @@ parse_arguments() {
             --reset) reset_firewall; exit 0 ;;
             --status) show_firewall_status; exit 0 ;;
             --help|-h) show_help; exit 0 ;;
-            *) error_exit "Unknown parameter: $1" ;;
+            *) error_exit "未知参数: $1" ;;
         esac
     done
 }
 
-# Check system environment
+# 检查系统环境
 check_system() {
-    info "Checking system environment..."
+    info "检查系统环境..."
     
     local tools=("iptables" "ss" "jq")
     local missing_tools=()
@@ -214,7 +213,7 @@ check_system() {
     done
     
     if [ ${#missing_tools[@]} -gt 0 ]; then
-        info "Installing missing tools: ${missing_tools[*]}"
+        info "安装缺失的工具: ${missing_tools[*]}"
         if [ "$DRY_RUN" = false ]; then
             if command -v apt-get >/dev/null 2>&1; then
                 apt-get update -qq && apt-get install -y iptables iproute2 jq netstat-nat
@@ -224,16 +223,18 @@ check_system() {
                 dnf install -y iptables iproute jq
             elif command -v pacman >/dev/null 2>&1; then
                 pacman -S --noconfirm iptables iproute2 jq
+            else
+                warning "无法自动安装依赖包，请手动安装: ${missing_tools[*]}"
             fi
         fi
     fi
     
-    success "System environment check completed"
+    success "系统环境检查完成"
 }
 
-# Detect SSH port
+# 检测 SSH 端口
 detect_ssh_port() {
-    debug_log "Detecting SSH port..."
+    debug_log "检测 SSH 端口..."
     
     local ssh_port=$(ss -tlnp 2>/dev/null | grep -E ':22\b|sshd' | awk '{print $4}' | awk -F: '{print $NF}' | head -1)
     
@@ -246,24 +247,24 @@ detect_ssh_port() {
     fi
     
     SSH_PORT="$ssh_port"
-    info "Detected SSH port: $SSH_PORT"
+    info "检测到 SSH 端口: $SSH_PORT"
 }
 
-# Detect existing NAT rules
+# 检测现有的 NAT 规则
 detect_existing_nat_rules() {
-    info "Detecting existing port forwarding rules..."
+    info "检测现有端口转发规则..."
     
     local nat_rules=()
     
     if command -v iptables >/dev/null 2>&1; then
-        debug_log "Scanning iptables PREROUTING NAT rules..."
+        debug_log "扫描 iptables PREROUTING NAT 规则..."
         
         while IFS= read -r line; do
             if [[ "$line" =~ ^(num|Chain|\-\-\-|$) ]]; then
                 continue
             fi
             
-            debug_log "Analyzing iptables rule: $line"
+            debug_log "分析 iptables 规则: $line"
             
             if echo "$line" | grep -qE "(DNAT|dnat)"; then
                 local port_range=""
@@ -288,7 +289,7 @@ detect_existing_nat_rules() {
                 if [ -n "$port_range" ] && [ -n "$target_port" ]; then
                     local rule_key="$port_range->$target_port"
                     nat_rules+=("$rule_key")
-                    debug_log "Found iptables port forwarding rule: $port_range -> $target_port"
+                    debug_log "发现 iptables 端口转发规则: $port_range -> $target_port"
                 fi
             fi
         done <<< "$(iptables -t nat -L PREROUTING -n -v --line-numbers 2>/dev/null)"
@@ -307,24 +308,24 @@ detect_existing_nat_rules() {
     fi
     
     if [ ${#NAT_RULES[@]} -gt 0 ]; then
-        echo -e "\n${GREEN}🔄 Detected existing port forwarding rules:${RESET}"
+        echo -e "\n${GREEN}🔄 检测到现有端口转发规则:${RESET}"
         for rule in "${NAT_RULES[@]}"; do
             echo -e "  ${GREEN}• $rule${RESET}"
         done
-        success "Detected ${#NAT_RULES[@]} port forwarding rules"
+        success "检测到 ${#NAT_RULES[@]} 条端口转发规则"
     else
-        info "No existing port forwarding rules detected"
+        info "未检测到现有端口转发规则"
     fi
 }
 
-# Interactive port range addition
+# 交互式端口范围添加
 add_port_range_interactive() {
-    echo -e "${CYAN}🔧 Configure port forwarding rules${RESET}"
-    echo -e "${YELLOW}Port forwarding allows redirecting a port range to a single target port${RESET}"
-    echo -e "${YELLOW}Example: 16820-16888 forwards to 16801${RESET}"
+    echo -e "${CYAN}🔧 配置端口转发规则${RESET}"
+    echo -e "${YELLOW}端口转发允许将端口范围重定向到单个目标端口${RESET}"
+    echo -e "${YELLOW}示例: 16820-16888 转发到 16801${RESET}"
     
     while true; do
-        echo -e "\n${CYAN}Please enter port range (format: start-end, like 16820-16888):${RESET}"
+        echo -e "\n${CYAN}请输入端口范围（格式: 起始-结束，如 16820-16888）:${RESET}"
         read -r port_range
         
         if [[ "$port_range" =~ ^([0-9]+)-([0-9]+)$ ]]; then
@@ -332,62 +333,62 @@ add_port_range_interactive() {
             local end_port="${BASH_REMATCH[2]}"
             
             if [ "$start_port" -ge "$end_port" ]; then
-                echo -e "${RED}Start port must be less than end port${RESET}"
+                echo -e "${RED}起始端口必须小于结束端口${RESET}"
                 continue
             fi
             
-            echo -e "${CYAN}Please enter target port (single port number):${RESET}"
+            echo -e "${CYAN}请输入目标端口（单个端口号）:${RESET}"
             read -r target_port
             
             if [[ "$target_port" =~ ^[0-9]+$ ]] && [ "$target_port" -ge 1 ] && [ "$target_port" -le 65535 ]; then
                 NAT_RULES+=("$port_range->$target_port")
                 DETECTED_PORTS+=("$target_port")
-                success "Added port forwarding rule: $port_range -> $target_port"
+                success "添加端口转发规则: $port_range -> $target_port"
                 
-                echo -e "${YELLOW}Continue adding other port forwarding rules? [y/N]${RESET}"
+                echo -e "${YELLOW}继续添加其他端口转发规则吗？[y/N]${RESET}"
                 read -r response
                 if [[ ! "$response" =~ ^[Yy]([eE][sS])?$ ]]; then
                     break
                 fi
             else
-                echo -e "${RED}Invalid target port: $target_port${RESET}"
+                echo -e "${RED}无效的目标端口: $target_port${RESET}"
             fi
         else
-            echo -e "${RED}Invalid port range format: $port_range${RESET}"
+            echo -e "${RED}无效的端口范围格式: $port_range${RESET}"
         fi
     done
 }
 
-# Detect proxy processes
+# 检测代理进程
 detect_proxy_processes() {
-    info "Detecting proxy service processes..."
+    info "检测代理服务进程..."
     
     local found_processes=()
     
     for process in "${PROXY_CORE_PROCESSES[@]}"; do
         if pgrep -f "$process" >/dev/null 2>&1; then
             found_processes+=("$process")
-            debug_log "Found proxy process: $process"
+            debug_log "发现代理进程: $process"
         fi
     done
     
     for process in "${WEB_PANEL_PROCESSES[@]}"; do
         if pgrep -f "$process" >/dev/null 2>&1; then
             found_processes+=("$process")
-            debug_log "Found web panel process: $process"
+            debug_log "发现 Web 面板进程: $process"
         fi
     done
     
     if [ ${#found_processes[@]} -gt 0 ]; then
-        success "Detected proxy-related processes: ${found_processes[*]}"
+        success "检测到代理相关进程: ${found_processes[*]}"
         return 0
     else
-        warning "No running proxy processes detected"
+        warning "未检测到运行中的代理进程"
         return 1
     fi
 }
 
-# Check bind address type
+# 检查绑定地址类型
 check_bind_address() {
     local address="$1"
     
@@ -402,15 +403,15 @@ check_bind_address() {
     fi
 }
 
-# Parse ports from config files
+# 从配置文件解析端口
 parse_config_ports() {
-    info "Parsing ports from configuration files..."
+    info "从配置文件解析端口..."
     
     local config_ports=()
     
     for config_file in "${PROXY_CONFIG_FILES[@]}"; do
         if [ -f "$config_file" ]; then
-            debug_log "Analyzing config file: $config_file"
+            debug_log "分析配置文件: $config_file"
             
             if [[ "$config_file" =~ \.json$ ]]; then
                 if command -v jq >/dev/null 2>&1; then
@@ -419,7 +420,7 @@ parse_config_ports() {
                         while read -r port; do
                             if ! is_internal_service_port "$port"; then
                                 config_ports+=("$port")
-                                debug_log "Parsed port from $config_file: $port"
+                                debug_log "从 $config_file 解析端口: $port"
                             fi
                         done <<< "$ports"
                     fi
@@ -430,7 +431,7 @@ parse_config_ports() {
                     while read -r port; do
                         if ! is_internal_service_port "$port"; then
                             config_ports+=("$port")
-                            debug_log "Parsed YAML port from $config_file: $port"
+                            debug_log "从 $config_file 解析 YAML 端口: $port"
                         fi
                     done <<< "$ports"
                 fi
@@ -441,13 +442,13 @@ parse_config_ports() {
     if [ ${#config_ports[@]} -gt 0 ]; then
         local unique_ports=($(printf '%s\n' "${config_ports[@]}" | sort -nu))
         DETECTED_PORTS+=("${unique_ports[@]}")
-        success "Parsed ${#unique_ports[@]} ports from configuration files"
+        success "从配置文件解析到 ${#unique_ports[@]} 个端口"
     fi
 }
 
-# Detect listening ports
+# 检测监听端口
 detect_listening_ports() {
-    info "Detecting currently listening ports..."
+    info "检测当前监听端口..."
     
     local listening_ports=()
     local localhost_ports=()
@@ -467,39 +468,39 @@ detect_listening_ports() {
             
             local bind_type=$(check_bind_address "$address_port")
             
-            debug_log "Detected listening: $address_port ($protocol, $process, $bind_type)"
+            debug_log "检测到监听: $address_port ($protocol, $process, $bind_type)"
             
             if is_proxy_related "$process" && [ -n "$port" ] && [ "$port" != "$SSH_PORT" ]; then
                 if [ "$bind_type" = "public" ]; then
                     if ! is_internal_service_port "$port"; then
                         listening_ports+=("$port")
-                        debug_log "Detected public proxy port: $port ($protocol, $process)"
+                        debug_log "检测到公共代理端口: $port ($protocol, $process)"
                     else
-                        debug_log "Skipped internal service port: $port"
+                        debug_log "跳过内部服务端口: $port"
                     fi
                 elif [ "$bind_type" = "localhost" ]; then
                     localhost_ports+=("$port")
-                    debug_log "Detected local proxy port: $port ($protocol, $process) - not exposed"
+                    debug_log "检测到本地代理端口: $port ($protocol, $process) - 不暴露"
                 fi
             fi
         fi
     done <<< "$(ss -tulnp 2>/dev/null)"
     
     if [ ${#localhost_ports[@]} -gt 0 ]; then
-        echo -e "\n${YELLOW}🔒 Detected internal service ports (localhost only):${RESET}"
+        echo -e "\n${YELLOW}🔒 检测到内部服务端口（仅本地）:${RESET}"
         for port in $(printf '%s\n' "${localhost_ports[@]}" | sort -nu); do
-            echo -e "  ${YELLOW}• $port${RESET} - Internal service, not exposed"
+            echo -e "  ${YELLOW}• $port${RESET} - 内部服务，不暴露"
         done
     fi
     
     if [ ${#listening_ports[@]} -gt 0 ]; then
         local unique_ports=($(printf '%s\n' "${listening_ports[@]}" | sort -nu))
         DETECTED_PORTS+=("${unique_ports[@]}")
-        success "Detected ${#unique_ports[@]} public listening ports"
+        success "检测到 ${#unique_ports[@]} 个公共监听端口"
     fi
 }
 
-# Check if process is proxy-related
+# 检查进程是否为代理相关
 is_proxy_related() {
     local process="$1"
     
@@ -516,7 +517,7 @@ is_proxy_related() {
     return 1
 }
 
-# Check if port is internal service
+# 检查端口是否为内部服务
 is_internal_service_port() {
     local port="$1"
     
@@ -529,7 +530,7 @@ is_internal_service_port() {
     return 1
 }
 
-# Check if port is standard proxy port
+# 检查端口是否为标准代理端口
 is_standard_proxy_port() {
     local port="$1"
     
@@ -550,40 +551,40 @@ is_standard_proxy_port() {
     return 1
 }
 
-# Port safety check
+# 端口安全检查
 is_port_safe() {
     local port="$1"
     
     for blacklist_port in "${BLACKLIST_PORTS[@]}"; do
         if [ "$port" = "$blacklist_port" ]; then
-            debug_log "Port $port is blacklisted"
+            debug_log "端口 $port 在黑名单中"
             return 1
         fi
     done
     
     if is_internal_service_port "$port"; then
-        debug_log "Port $port is internal service port"
+        debug_log "端口 $port 是内部服务端口"
         return 1
     fi
     
     if [ "$port" -lt 1 ] || [ "$port" -gt 65535 ]; then
-        debug_log "Port $port out of valid range"
+        debug_log "端口 $port 超出有效范围"
         return 1
     fi
     
     if [[ " ${DEFAULT_OPEN_PORTS[*]} " =~ " $port " ]]; then
-        debug_log "Port $port is default open port"
+        debug_log "端口 $port 是默认开放端口"
         return 0
     fi
     
     return 0
 }
 
-# Filter and confirm ports
+# 过滤并确认端口
 filter_and_confirm_ports() {
-    info "Intelligent port analysis and confirmation..."
+    info "智能端口分析和确认..."
     
-    info "Adding default open ports: ${DEFAULT_OPEN_PORTS[*]}"
+    info "添加默认开放端口: ${DEFAULT_OPEN_PORTS[*]}"
     DETECTED_PORTS+=("${DEFAULT_OPEN_PORTS[@]}")
     
     local all_ports=($(printf '%s\n' "${DETECTED_PORTS[@]}" | sort -nu))
@@ -607,53 +608,53 @@ filter_and_confirm_ports() {
     done
     
     if [ ${#safe_ports[@]} -gt 0 ]; then
-        echo -e "\n${GREEN}✅ Standard proxy ports (recommended):${RESET}"
+        echo -e "\n${GREEN}✅ 标准代理端口（推荐）:${RESET}"
         for port in "${safe_ports[@]}"; do
             if [[ " ${DEFAULT_OPEN_PORTS[*]} " =~ " $port " ]]; then
-                echo -e "  ${GREEN}✓ $port${RESET} - Default open port"
+                echo -e "  ${GREEN}✓ $port${RESET} - 默认开放端口"
             else
-                echo -e "  ${GREEN}✓ $port${RESET} - Common proxy port"
+                echo -e "  ${GREEN}✓ $port${RESET} - 常用代理端口"
             fi
         done
     fi
     
     if [ ${#internal_ports[@]} -gt 0 ]; then
-        echo -e "\n${YELLOW}🔒 Internal service ports (filtered):${RESET}"
+        echo -e "\n${YELLOW}🔒 内部服务端口（已过滤）:${RESET}"
         for port in "${internal_ports[@]}"; do
-            echo -e "  ${YELLOW}- $port${RESET} - Internal service port, not exposed"
+            echo -e "  ${YELLOW}- $port${RESET} - 内部服务端口，不暴露"
         done
     fi
     
     if [ ${#suspicious_ports[@]} -gt 0 ]; then
-        echo -e "\n${YELLOW}⚠️  Suspicious ports (require confirmation):${RESET}"
+        echo -e "\n${YELLOW}⚠️  可疑端口（需要确认）:${RESET}"
         for port in "${suspicious_ports[@]}"; do
-            echo -e "  ${YELLOW}? $port${RESET} - Not a standard proxy port"
+            echo -e "  ${YELLOW}? $port${RESET} - 非标准代理端口"
         done
         
-        echo -e "\n${YELLOW}These ports may not be necessary proxy ports${RESET}"
+        echo -e "\n${YELLOW}这些端口可能不是必要的代理端口${RESET}"
         
         if [ "$DRY_RUN" = false ]; then
-            echo -e "${YELLOW}Open these suspicious ports too? [y/N]${RESET}"
+            echo -e "${YELLOW}也要开放这些可疑端口吗？[y/N]${RESET}"
             read -r response
             if [[ "$response" =~ ^[Yy]([eE][sS])?$ ]]; then
                 safe_ports+=("${suspicious_ports[@]}")
-                info "User confirmed opening suspicious ports"
+                info "用户确认开放可疑端口"
             else
-                info "Skipping suspicious ports"
+                info "跳过可疑端口"
             fi
         fi
     fi
     
     if [ ${#unsafe_ports[@]} -gt 0 ]; then
-        echo -e "\n${RED}❌ Dangerous ports (skipped):${RESET}"
+        echo -e "\n${RED}❌ 危险端口（已跳过）:${RESET}"
         for port in "${unsafe_ports[@]}"; do
-            echo -e "  ${RED}✗ $port${RESET} - System port or dangerous port"
+            echo -e "  ${RED}✗ $port${RESET} - 系统端口或危险端口"
         done
     fi
     
     if [ "$DRY_RUN" = false ] && [ ${#NAT_RULES[@]} -eq 0 ]; then
-        echo -e "\n${CYAN}🔄 Configure port forwarding functionality? [y/N]${RESET}"
-        echo -e "${YELLOW}Port forwarding can redirect a port range to a single target port${RESET}"
+        echo -e "\n${CYAN}🔄 配置端口转发功能吗？[y/N]${RESET}"
+        echo -e "${YELLOW}端口转发可以将端口范围重定向到单个目标端口${RESET}"
         read -r response
         if [[ "$response" =~ ^[Yy]([eE][sS])?$ ]]; then
             add_port_range_interactive
@@ -661,35 +662,35 @@ filter_and_confirm_ports() {
     fi
     
     if [ ${#safe_ports[@]} -eq 0 ]; then
-        warning "No standard proxy ports detected"
+        warning "未检测到标准代理端口"
         safe_ports=("${DEFAULT_OPEN_PORTS[@]}")
     fi
     
     if [ "$DRY_RUN" = false ]; then
-        echo -e "\n${CYAN}📋 Final ports to open:${RESET}"
+        echo -e "\n${CYAN}📋 最终要开放的端口:${RESET}"
         for port in "${safe_ports[@]}"; do
             if [[ " ${DEFAULT_OPEN_PORTS[*]} " =~ " $port " ]]; then
-                echo -e "  ${CYAN}• $port${RESET} (default open)"
+                echo -e "  ${CYAN}• $port${RESET} (默认开放)"
             else
                 echo -e "  ${CYAN}• $port${RESET}"
             fi
         done
         
         if [ ${#NAT_RULES[@]} -gt 0 ]; then
-            echo -e "\n${CYAN}🔄 Port forwarding rules:${RESET}"
+            echo -e "\n${CYAN}🔄 端口转发规则:${RESET}"
             for rule in "${NAT_RULES[@]}"; do
                 echo -e "  ${CYAN}• $rule${RESET}"
             done
         fi
         
-        echo -e "\n${YELLOW}Confirm opening ${#safe_ports[@]} ports"
+        echo -e "\n${YELLOW}确认开放 ${#safe_ports[@]} 个端口"
         if [ ${#NAT_RULES[@]} -gt 0 ]; then
-            echo -e "and ${#NAT_RULES[@]} port forwarding rules"
+            echo -e "和 ${#NAT_RULES[@]} 条端口转发规则"
         fi
-        echo -e "? [Y/n]${RESET}"
+        echo -e "吗？[Y/n]${RESET}"
         read -r response
         if [[ ! "$response" =~ ^[Yy]?$ ]]; then
-            info "User cancelled operation"
+            info "用户取消操作"
             exit 0
         fi
     fi
@@ -698,12 +699,12 @@ filter_and_confirm_ports() {
     return 0
 }
 
-# Clean existing firewalls
+# 清理现有防火墙
 cleanup_firewalls() {
-    info "Cleaning existing firewall configuration..."
+    info "清理现有防火墙配置..."
     
     if [ "$DRY_RUN" = true ]; then
-        info "[Preview mode] Will clean existing firewall"
+        info "[预览模式] 将清理现有防火墙"
         return 0
     fi
     
@@ -711,7 +712,7 @@ cleanup_firewalls() {
         if systemctl is-active --quiet "$service" 2>/dev/null; then
             systemctl stop "$service" >/dev/null 2>&1 || true
             systemctl disable "$service" >/dev/null 2>&1 || true
-            success "Disabled $service"
+            success "已禁用 $service"
         fi
     done
     
@@ -719,11 +720,11 @@ cleanup_firewalls() {
         ufw --force reset >/dev/null 2>&1 || true
     fi
     
-    # Backup existing NAT rules
+    # 备份现有 NAT 规则
     local nat_backup="/tmp/nat_rules_backup.txt"
     iptables-save -t nat > "$nat_backup" 2>/dev/null || true
     
-    # Clear filter table rules but keep basic policies
+    # 清理 filter 表规则但保持基本策略
     iptables -P INPUT ACCEPT 2>/dev/null || true
     iptables -P FORWARD ACCEPT 2>/dev/null || true
     iptables -P OUTPUT ACCEPT 2>/dev/null || true
@@ -731,72 +732,72 @@ cleanup_firewalls() {
     iptables -F FORWARD 2>/dev/null || true
     iptables -F OUTPUT 2>/dev/null || true
     
-    # Clear custom chains
+    # 清理自定义链
     iptables -X 2>/dev/null || true
     
-    success "Firewall cleanup completed (NAT rules preserved)"
+    success "防火墙清理完成（NAT 规则已保留）"
 }
 
-# Setup SSH protection
+# 设置 SSH 保护
 setup_ssh_protection() {
-    info "Setting up SSH brute force protection..."
+    info "设置 SSH 暴力破解防护..."
     
     if [ "$DRY_RUN" = true ]; then
-        info "[Preview mode] Will setup SSH protection"
+        info "[预览模式] 将设置 SSH 保护"
         return 0
     fi
     
-    # Create SSH protection chain
+    # 创建 SSH 保护链
     iptables -N SSH_PROTECTION 2>/dev/null || true
     iptables -F SSH_PROTECTION 2>/dev/null || true
     
-    # SSH brute force protection rules
+    # SSH 暴力破解防护规则
     iptables -A SSH_PROTECTION -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
     iptables -A SSH_PROTECTION -m recent --name ssh_attempts --update --seconds 60 --hitcount 4 -j DROP
     iptables -A SSH_PROTECTION -m recent --name ssh_attempts --set
     iptables -A SSH_PROTECTION -j ACCEPT
     
-    success "SSH brute force protection configured"
+    success "SSH 暴力破解防护已配置"
 }
 
-# Apply iptables rules
+# 应用 iptables 规则
 apply_firewall_rules() {
-    info "Applying iptables firewall rules..."
+    info "应用 iptables 防火墙规则..."
     
     if [ "$DRY_RUN" = true ]; then
-        info "[Preview mode] Firewall rules preview:"
+        info "[预览模式] 防火墙规则预览:"
         show_rules_preview
         return 0
     fi
     
-    # Set default policies (ACCEPT first to avoid lockout)
+    # 设置默认策略（先设置 ACCEPT 避免锁定）
     iptables -P INPUT ACCEPT
     iptables -P FORWARD DROP
     iptables -P OUTPUT ACCEPT
     
-    # Basic rules: allow loopback
+    # 基本规则：允许回环
     iptables -A INPUT -i lo -j ACCEPT
     
-    # Basic rules: allow established and related connections
+    # 基本规则：允许已建立和相关连接
     iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
     
-    # ICMP support (network diagnostics)
+    # ICMP 支持（网络诊断）
     iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 10/sec -j ACCEPT
     
-    # SSH protection
+    # SSH 保护
     setup_ssh_protection
     iptables -A INPUT -p tcp --dport "$SSH_PORT" -j SSH_PROTECTION
     
-    # Open proxy ports (TCP and UDP)
+    # 开放代理端口（TCP 和 UDP）
     for port in "${DETECTED_PORTS[@]}"; do
         iptables -A INPUT -p tcp --dport "$port" -j ACCEPT
         iptables -A INPUT -p udp --dport "$port" -j ACCEPT
-        debug_log "Opened port: $port (TCP/UDP)"
+        debug_log "开放端口: $port (TCP/UDP)"
     done
     
-    # Apply NAT rules (port forwarding)
+    # 应用 NAT 规则（端口转发）
     if [ ${#NAT_RULES[@]} -gt 0 ]; then
-        info "Applying port forwarding rules..."
+        info "应用端口转发规则..."
         for rule in "${NAT_RULES[@]}"; do
             local port_range=$(split_nat_rule "$rule" "->" "1")
             local target_port=$(split_nat_rule "$rule" "->" "2")
@@ -805,38 +806,38 @@ apply_firewall_rules() {
                 local start_port=$(echo "$port_range" | cut -d'-' -f1)
                 local end_port=$(echo "$port_range" | cut -d'-' -f2)
                 
-                # Add DNAT rules
+                # 添加 DNAT 规则
                 iptables -t nat -A PREROUTING -p udp --dport "$start_port:$end_port" -j DNAT --to-destination ":$target_port"
                 iptables -t nat -A PREROUTING -p tcp --dport "$start_port:$end_port" -j DNAT --to-destination ":$target_port"
                 
-                # Open port range
+                # 开放端口范围
                 iptables -A INPUT -p tcp --dport "$start_port:$end_port" -j ACCEPT
                 iptables -A INPUT -p udp --dport "$start_port:$end_port" -j ACCEPT
                 
-                success "Applied port forwarding: $port_range -> $target_port"
-                debug_log "NAT rule: $start_port:$end_port -> $target_port"
+                success "应用端口转发: $port_range -> $target_port"
+                debug_log "NAT 规则: $start_port:$end_port -> $target_port"
             else
-                warning "Cannot parse NAT rule: $rule"
+                warning "无法解析 NAT 规则: $rule"
             fi
         done
     fi
     
-    # Log and drop other connections (limit log frequency)
+    # 记录并丢弃其他连接（限制日志频率）
     iptables -A INPUT -m limit --limit 3/min --limit-burst 3 -j LOG --log-prefix "iptables-drop: " --log-level 4
     
-    # Finally set default drop policy
+    # 最后设置默认丢弃策略
     iptables -P INPUT DROP
     
     OPENED_PORTS=${#DETECTED_PORTS[@]}
-    success "iptables rules applied successfully"
+    success "iptables 规则应用成功"
     
-    # Save rules
+    # 保存规则
     save_iptables_rules
 }
 
-# Save iptables rules
+# 保存 iptables 规则
 save_iptables_rules() {
-    info "Saving iptables rules..."
+    info "保存 iptables 规则..."
     
     if command -v iptables-save >/dev/null 2>&1; then
         if [ -d "/etc/iptables" ]; then
@@ -844,7 +845,7 @@ save_iptables_rules() {
             
             cat > /etc/systemd/system/iptables-restore.service << 'EOF'
 [Unit]
-Description=Restore iptables rules
+Description=恢复 iptables 规则
 Before=network-pre.target
 Wants=network-pre.target
 
@@ -867,31 +868,31 @@ EOF
             iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
         fi
         
-        success "iptables rules saved"
+        success "iptables 规则已保存"
     else
-        warning "Cannot save iptables rules, rules will be lost after reboot"
+        warning "无法保存 iptables 规则，规则将在重启后丢失"
     fi
 }
 
-# Show rules preview
+# 显示规则预览
 show_rules_preview() {
-    echo -e "${CYAN}📋 iptables rules preview to be applied:${RESET}"
+    echo -e "${CYAN}📋 即将应用的 iptables 规则预览:${RESET}"
     echo
-    echo "# Basic rules"
+    echo "# 基本规则"
     echo "iptables -P INPUT DROP"
     echo "iptables -P FORWARD DROP"
     echo "iptables -P OUTPUT ACCEPT"
     echo "iptables -A INPUT -i lo -j ACCEPT"
     echo "iptables -A INPUT -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT"
     echo
-    echo "# ICMP support"
+    echo "# ICMP 支持"
     echo "iptables -A INPUT -p icmp --icmp-type echo-request -m limit --limit 10/sec -j ACCEPT"
     echo
-    echo "# SSH protection"
+    echo "# SSH 保护"
     echo "iptables -A INPUT -p tcp --dport $SSH_PORT -m recent --name ssh_attempts --update --seconds 60 --hitcount 4 -j DROP"
     echo "iptables -A INPUT -p tcp --dport $SSH_PORT -m recent --name ssh_attempts --set -j ACCEPT"
     echo
-    echo "# Proxy ports"
+    echo "# 代理端口"
     for port in "${DETECTED_PORTS[@]}"; do
         echo "iptables -A INPUT -p tcp --dport $port -j ACCEPT"
         echo "iptables -A INPUT -p udp --dport $port -j ACCEPT"
@@ -899,7 +900,7 @@ show_rules_preview() {
     
     if [ ${#NAT_RULES[@]} -gt 0 ]; then
         echo
-        echo "# Port forwarding rules"
+        echo "# 端口转发规则"
         for rule in "${NAT_RULES[@]}"; do
             local port_range=$(split_nat_rule "$rule" "->" "1")
             local target_port=$(split_nat_rule "$rule" "->" "2")
@@ -913,74 +914,74 @@ show_rules_preview() {
     fi
     
     echo
-    echo "# Logging and drop"
+    echo "# 日志记录和丢弃"
     echo "iptables -A INPUT -m limit --limit 3/min -j LOG --log-prefix 'iptables-drop: '"
     echo "iptables -A INPUT -j DROP"
 }
 
-# Verify port forwarding functionality
+# 验证端口转发功能
 verify_port_hopping() {
     if [ ${#NAT_RULES[@]} -gt 0 ]; then
-        info "Verifying port forwarding configuration..."
+        info "验证端口转发配置..."
         
-        echo -e "\n${CYAN}🔍 Current NAT rules status:${RESET}"
+        echo -e "\n${CYAN}🔍 当前 NAT 规则状态:${RESET}"
         if command -v iptables >/dev/null 2>&1; then
-            iptables -t nat -L PREROUTING -n -v --line-numbers 2>/dev/null | grep DNAT || echo "No NAT rules"
+            iptables -t nat -L PREROUTING -n -v --line-numbers 2>/dev/null | grep DNAT || echo "无 NAT 规则"
         fi
         
-        echo -e "\n${YELLOW}💡 Port forwarding usage instructions:${RESET}"
-        echo -e "  - Clients can connect to any port within the range"
-        echo -e "  - All connections will be forwarded to the target port"
-        echo -e "  - Example: connections to any port in range forward to target port"
+        echo -e "\n${YELLOW}💡 端口转发使用说明:${RESET}"
+        echo -e "  - 客户端可以连接到范围内的任意端口"
+        echo -e "  - 所有连接都会转发到目标端口"
+        echo -e "  - 示例：范围内端口的连接转发到目标端口"
         
         local checked_ports=()
         for rule in "${NAT_RULES[@]}"; do
             local port_range=$(split_nat_rule "$rule" "->" "1")
             local target_port=$(split_nat_rule "$rule" "->" "2")
             
-            debug_log "Verifying rule: $port_range -> $target_port"
+            debug_log "验证规则: $port_range -> $target_port"
             
             if [ -n "$target_port" ]; then
                 if [[ ! " ${checked_ports[*]} " =~ " $target_port " ]]; then
                     checked_ports+=("$target_port")
                     
                     if ss -tlnp 2>/dev/null | grep -q ":$target_port "; then
-                        echo -e "  ${GREEN}✓ Target port $target_port is listening${RESET}"
+                        echo -e "  ${GREEN}✓ 目标端口 $target_port 正在监听${RESET}"
                     else
-                        echo -e "  ${YELLOW}⚠️  Target port $target_port is not listening${RESET}"
-                        echo -e "    ${YELLOW}Hint: Please ensure proxy service is running on port $target_port${RESET}"
+                        echo -e "  ${YELLOW}⚠️  目标端口 $target_port 未在监听${RESET}"
+                        echo -e "    ${YELLOW}提示: 请确保代理服务在端口 $target_port 上运行${RESET}"
                     fi
                 fi
             else
-                echo -e "  ${RED}❌ Cannot parse rule: $rule${RESET}"
+                echo -e "  ${RED}❌ 无法解析规则: $rule${RESET}"
             fi
         done
         
-        echo -e "\n${CYAN}📝 Port forwarding rules summary:${RESET}"
+        echo -e "\n${CYAN}📝 端口转发规则摘要:${RESET}"
         local unique_rules=($(printf '%s\n' "${NAT_RULES[@]}" | sort -u))
         for rule in "${unique_rules[@]}"; do
             local port_range=$(split_nat_rule "$rule" "->" "1")
             local target_port=$(split_nat_rule "$rule" "->" "2")
-            echo -e "  ${CYAN}• Port range $port_range → Target port $target_port${RESET}"
+            echo -e "  ${CYAN}• 端口范围 $port_range → 目标端口 $target_port${RESET}"
         done
     fi
 }
 
-# Reset firewall
+# 重置防火墙
 reset_firewall() {
-    echo -e "${YELLOW}🔄 Reset firewall to default state${RESET}"
+    echo -e "${YELLOW}🔄 重置防火墙到默认状态${RESET}"
     
     if [ "$DRY_RUN" = false ]; then
-        echo -e "${RED}Warning: This will clear all iptables rules!${RESET}"
-        echo -e "${YELLOW}Confirm firewall reset? [y/N]${RESET}"
+        echo -e "${RED}警告: 这将清除所有 iptables 规则！${RESET}"
+        echo -e "${YELLOW}确认重置防火墙吗？[y/N]${RESET}"
         read -r response
         if [[ ! "$response" =~ ^[Yy]([eE][sS])?$ ]]; then
-            info "Reset operation cancelled"
+            info "重置操作已取消"
             return 0
         fi
     fi
     
-    info "Resetting iptables rules..."
+    info "重置 iptables 规则..."
     
     if [ "$DRY_RUN" = false ]; then
         iptables -P INPUT ACCEPT
@@ -996,25 +997,25 @@ reset_firewall() {
         
         save_iptables_rules
         
-        success "Firewall reset to default state"
+        success "防火墙已重置到默认状态"
     else
-        info "[Preview mode] Will reset all iptables rules"
+        info "[预览模式] 将重置所有 iptables 规则"
     fi
 }
 
-# Show firewall status
+# 显示防火墙状态
 show_firewall_status() {
-    echo -e "${CYAN}🔍 Current firewall status${RESET}"
+    echo -e "${CYAN}🔍 当前防火墙状态${RESET}"
     echo
     
-    echo -e "${GREEN}📊 iptables rules statistics:${RESET}"
+    echo -e "${GREEN}📊 iptables 规则统计:${RESET}"
     local input_rules=$(iptables -L INPUT --line-numbers 2>/dev/null | wc -l)
     local nat_rules=$(iptables -t nat -L PREROUTING --line-numbers 2>/dev/null | wc -l)
-    echo -e "  INPUT rules: $((input_rules - 2))"
-    echo -e "  NAT rules: $((nat_rules - 2))"
+    echo -e "  INPUT 规则数: $((input_rules - 2))"
+    echo -e "  NAT 规则数: $((nat_rules - 2))"
     echo
     
-    echo -e "${GREEN}🔓 Open ports:${RESET}"
+    echo -e "${GREEN}🔓 开放的端口:${RESET}"
     iptables -L INPUT -n 2>/dev/null | grep ACCEPT | grep -E "dpt:[0-9]+" | while read -r line; do
         local port=$(echo "$line" | grep -oE "dpt:[0-9]+" | cut -d: -f2)
         local protocol=$(echo "$line" | awk '{print $1}' | tr '[:upper:]' '[:lower:]')
@@ -1024,7 +1025,7 @@ show_firewall_status() {
     done
     echo
     
-    echo -e "${GREEN}🔄 Port forwarding rules:${RESET}"
+    echo -e "${GREEN}🔄 端口转发规则:${RESET}"
     local nat_count=0
     while read -r line; do
         if echo "$line" | grep -q "DNAT"; then
@@ -1038,48 +1039,48 @@ show_firewall_status() {
     done <<< "$(iptables -t nat -L PREROUTING -n -v 2>/dev/null)"
     
     if [ "$nat_count" -eq 0 ]; then
-        echo -e "  ${YELLOW}No port forwarding rules${RESET}"
+        echo -e "  ${YELLOW}无端口转发规则${RESET}"
     fi
     echo
     
-    echo -e "${GREEN}🛡️  SSH protection status:${RESET}"
+    echo -e "${GREEN}🛡️  SSH 保护状态:${RESET}"
     if iptables -L INPUT -n 2>/dev/null | grep -q "recent:"; then
-        echo -e "  ${GREEN}✓ SSH brute force protection enabled${RESET}"
+        echo -e "  ${GREEN}✓ SSH 暴力破解防护已启用${RESET}"
     else
-        echo -e "  ${YELLOW}⚠️  SSH brute force protection not enabled${RESET}"
+        echo -e "  ${YELLOW}⚠️  SSH 暴力破解防护未启用${RESET}"
     fi
     echo
     
-    echo -e "${CYAN}🔧 Management commands:${RESET}"
-    echo -e "  ${YELLOW}View all rules:${RESET} iptables -L -n -v"
-    echo -e "  ${YELLOW}View NAT rules:${RESET} iptables -t nat -L -n -v"
-    echo -e "  ${YELLOW}View listening ports:${RESET} ss -tlnp"
-    echo -e "  ${YELLOW}Reconfigure:${RESET} bash $0"
-    echo -e "  ${YELLOW}Reset firewall:${RESET} bash $0 --reset"
+    echo -e "${CYAN}🔧 管理命令:${RESET}"
+    echo -e "  ${YELLOW}查看所有规则:${RESET} iptables -L -n -v"
+    echo -e "  ${YELLOW}查看 NAT 规则:${RESET} iptables -t nat -L -n -v"
+    echo -e "  ${YELLOW}查看监听端口:${RESET} ss -tlnp"
+    echo -e "  ${YELLOW}重新配置:${RESET} bash $0"
+    echo -e "  ${YELLOW}重置防火墙:${RESET} bash $0 --reset"
 }
 
-# Show final status
+# 显示最终状态
 show_final_status() {
     echo -e "\n${GREEN}=================================="
-    echo -e "🎉 iptables firewall configuration completed!"
+    echo -e "🎉 iptables 防火墙配置完成！"
     echo -e "==================================${RESET}"
     
-    echo -e "\n${CYAN}📊 Configuration summary:${RESET}"
-    echo -e "  ${GREEN}✓ Opened ports: $OPENED_PORTS${RESET}"
-    echo -e "  ${GREEN}✓ SSH port: $SSH_PORT (protected)${RESET}"
-    echo -e "  ${GREEN}✓ Firewall engine: iptables${RESET}"
-    echo -e "  ${GREEN}✓ Internal service protection: enabled${RESET}"
-    echo -e "  ${GREEN}✓ Default ports: 80, 443 (permanently open)${RESET}"
+    echo -e "\n${CYAN}📊 配置摘要:${RESET}"
+    echo -e "  ${GREEN}✓ 开放端口数: $OPENED_PORTS${RESET}"
+    echo -e "  ${GREEN}✓ SSH 端口: $SSH_PORT (已保护)${RESET}"
+    echo -e "  ${GREEN}✓ 防火墙引擎: iptables${RESET}"
+    echo -e "  ${GREEN}✓ 内部服务保护: 已启用${RESET}"
+    echo -e "  ${GREEN}✓ 默认端口: 80, 443 (永久开放)${RESET}"
     if [ ${#NAT_RULES[@]} -gt 0 ]; then
         local unique_nat_rules=($(printf '%s\n' "${NAT_RULES[@]}" | sort -u))
-        echo -e "  ${GREEN}✓ Port forwarding rules: ${#unique_nat_rules[@]}${RESET}"
+        echo -e "  ${GREEN}✓ 端口转发规则: ${#unique_nat_rules[@]} 条${RESET}"
     fi
     
     if [ ${#DETECTED_PORTS[@]} -gt 0 ]; then
-        echo -e "\n${GREEN}🔓 Opened ports:${RESET}"
+        echo -e "\n${GREEN}🔓 已开放端口:${RESET}"
         for port in "${DETECTED_PORTS[@]}"; do
             if [[ " ${DEFAULT_OPEN_PORTS[*]} " =~ " $port " ]]; then
-                echo -e "  ${GREEN}• $port (TCP/UDP) - Default open${RESET}"
+                echo -e "  ${GREEN}• $port (TCP/UDP) - 默认开放${RESET}"
             else
                 echo -e "  ${GREEN}• $port (TCP/UDP)${RESET}"
             fi
@@ -1087,7 +1088,7 @@ show_final_status() {
     fi
     
     if [ ${#NAT_RULES[@]} -gt 0 ]; then
-        echo -e "\n${CYAN}🔄 Port forwarding rules:${RESET}"
+        echo -e "\n${CYAN}🔄 端口转发规则:${RESET}"
         local unique_rules=($(printf '%s\n' "${NAT_RULES[@]}" | sort -u))
         for rule in "${unique_rules[@]}"; do
             local port_range=$(split_nat_rule "$rule" "->" "1")
@@ -1097,19 +1098,19 @@ show_final_status() {
     fi
     
     if [ "$DRY_RUN" = true ]; then
-        echo -e "\n${CYAN}🔍 This was preview mode, firewall not actually modified${RESET}"
+        echo -e "\n${CYAN}🔍 这是预览模式，防火墙实际未被修改${RESET}"
         return 0
     fi
     
-    echo -e "\n${CYAN}🔧 Management commands:${RESET}"
-    echo -e "  ${YELLOW}View rules:${RESET} iptables -L -n -v"
-    echo -e "  ${YELLOW}View ports:${RESET} ss -tlnp"
-    echo -e "  ${YELLOW}View NAT rules:${RESET} iptables -t nat -L -n -v"
-    echo -e "  ${YELLOW}View status:${RESET} bash $0 --status"
-    echo -e "  ${YELLOW}Add port forwarding:${RESET} bash $0 --add-range"
-    echo -e "  ${YELLOW}Reset firewall:${RESET} bash $0 --reset"
+    echo -e "\n${CYAN}🔧 管理命令:${RESET}"
+    echo -e "  ${YELLOW}查看规则:${RESET} iptables -L -n -v"
+    echo -e "  ${YELLOW}查看端口:${RESET} ss -tlnp"
+    echo -e "  ${YELLOW}查看 NAT 规则:${RESET} iptables -t nat -L -n -v"
+    echo -e "  ${YELLOW}查看状态:${RESET} bash $0 --status"
+    echo -e "  ${YELLOW}添加端口转发:${RESET} bash $0 --add-range"
+    echo -e "  ${YELLOW}重置防火墙:${RESET} bash $0 --reset"
     
-    echo -e "\n${GREEN}✅ Proxy ports precisely opened, port forwarding configured, internal services protected, server security enabled!${RESET}"
+    echo -e "\n${GREEN}✅ 代理端口精确开放，端口转发已配置，内部服务受保护，服务器安全已启用！${RESET}"
     
     if [ ${#NAT_RULES[@]} -gt 0 ]; then
         local has_unlistened=false
@@ -1127,19 +1128,19 @@ show_final_status() {
         done
         
         if [ "$has_unlistened" = true ]; then
-            echo -e "\n${YELLOW}⚠️  Reminder: Some port forwarding target ports are not listening${RESET}"
-            echo -e "${YELLOW}   Please ensure related proxy services are running, otherwise port forwarding may not work${RESET}"
+            echo -e "\n${YELLOW}⚠️  提醒: 某些端口转发目标端口未在监听${RESET}"
+            echo -e "${YELLOW}   请确保相关代理服务正在运行，否则端口转发可能无法工作${RESET}"
         fi
     fi
 }
 
-# Main function
+# 主函数
 main() {
-    trap 'echo -e "\n${RED}Operation interrupted${RESET}"; exit 130' INT TERM
+    trap 'echo -e "\n${RED}操作被中断${RESET}"; exit 130' INT TERM
     
     parse_arguments "$@"
     
-    echo -e "\n${CYAN}🚀 Starting intelligent proxy port detection and configuration...${RESET}"
+    echo -e "\n${CYAN}🚀 开始智能代理端口检测和配置...${RESET}"
     
     check_system
     detect_ssh_port
@@ -1147,17 +1148,17 @@ main() {
     cleanup_firewalls
     
     if ! detect_proxy_processes; then
-        warning "Recommend starting proxy services before running this script for best results"
+        warning "建议在运行此脚本之前启动代理服务以获得最佳效果"
     fi
     
     parse_config_ports
     detect_listening_ports
     
     if ! filter_and_confirm_ports; then
-        info "Adding Hiddify common ports as backup..."
+        info "添加 Hiddify 常用端口作为备用..."
         DETECTED_PORTS=("${HIDDIFY_COMMON_PORTS[@]}")
         if ! filter_and_confirm_ports; then
-            error_exit "Cannot determine ports to open"
+            error_exit "无法确定要开放的端口"
         fi
     fi
     
@@ -1166,5 +1167,5 @@ main() {
     show_final_status
 }
 
-# Script entry point
+# 脚本入口点
 main "$@"
