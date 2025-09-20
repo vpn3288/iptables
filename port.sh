@@ -161,6 +161,7 @@ show_help() {
     --dry-run         预览模式，不实际修改防火墙
     --add-range       交互式端口范围添加
     --reset           重置防火墙到默认状态
+    --clean-nat       清理重复的NAT规则
     --status          显示当前防火墙状态
     --help, -h        显示此帮助信息
 
@@ -180,8 +181,45 @@ show_help() {
     ✓ 危险端口过滤
     ✓ SSH 暴力破解防护
     ✓ 稳定的 iptables 防火墙
+    ✓ 重复NAT规则清理
 
 EOF
+}
+
+# 单独的NAT规则清理函数
+clean_nat_rules_only() {
+    echo -e "${YELLOW}🔄 清理重复的NAT规则${RESET}"
+    
+    if [ "$DRY_RUN" = false ]; then
+        echo -e "${RED}警告: 这将清除所有现有的NAT端口转发规则！${RESET}"
+        echo -e "${YELLOW}确认清理NAT规则吗？[y/N]${RESET}"
+        read -r response
+        if [[ ! "$response" =~ ^[Yy]([eE][sS])?$ ]]; then
+            info "清理操作已取消"
+            return 0
+        fi
+    fi
+    
+    info "正在清理NAT规则..."
+    
+    # 统计当前规则数量
+    local rule_count=$(iptables -t nat -L PREROUTING -n --line-numbers 2>/dev/null | grep -c "DNAT.*dpts:" || echo "0")
+    
+    if [ "$DRY_RUN" = false ]; then
+        # 清理PREROUTING链中的所有DNAT规则
+        iptables -t nat -F PREROUTING 2>/dev/null || true
+        success "已清理 $rule_count 条NAT规则"
+        
+        # 保存更改
+        save_iptables_rules
+    else
+        info "[预览模式] 将清理 $rule_count 条NAT规则"
+    fi
+    
+    echo -e "\n${GREEN}✅ NAT规则清理完成${RESET}"
+    if [ "$rule_count" -gt 0 ]; then
+        echo -e "${CYAN}💡 提示: 如需重新配置端口转发，请运行 'bash $0 --add-range'${RESET}"
+    fi
 }
 
 # 解析参数
@@ -192,6 +230,7 @@ parse_arguments() {
             --dry-run) DRY_RUN=true; shift ;;
             --add-range) add_port_range_interactive; exit 0 ;;
             --reset) reset_firewall; exit 0 ;;
+            --clean-nat) clean_nat_rules_only; exit 0 ;;
             --status) show_firewall_status; exit 0 ;;
             --help|-h) show_help; exit 0 ;;
             *) error_exit "未知参数: $1" ;;
@@ -699,6 +738,35 @@ filter_and_confirm_ports() {
     return 0
 }
 
+# 清理重复的NAT规则
+cleanup_duplicate_nat_rules() {
+    info "清理重复的NAT规则..."
+    
+    if [ "$DRY_RUN" = true ]; then
+        info "[预览模式] 将清理重复的NAT规则"
+        return 0
+    fi
+    
+    # 获取当前NAT规则并统计重复
+    local duplicate_count=0
+    while IFS= read -r line; do
+        if echo "$line" | grep -q "DNAT.*dpts:"; then
+            duplicate_count=$((duplicate_count + 1))
+        fi
+    done <<< "$(iptables -t nat -L PREROUTING -n --line-numbers 2>/dev/null | grep DNAT)"
+    
+    if [ "$duplicate_count" -gt 0 ]; then
+        info "发现 $duplicate_count 条现有DNAT规则，正在清理..."
+        
+        # 清理PREROUTING链中的所有DNAT规则
+        iptables -t nat -F PREROUTING 2>/dev/null || true
+        
+        success "已清理 $duplicate_count 条重复NAT规则"
+    else
+        info "未发现重复的NAT规则"
+    fi
+}
+
 # 清理现有防火墙
 cleanup_firewalls() {
     info "清理现有防火墙配置..."
@@ -724,6 +792,9 @@ cleanup_firewalls() {
     local nat_backup="/tmp/nat_rules_backup.txt"
     iptables-save -t nat > "$nat_backup" 2>/dev/null || true
     
+    # 清理重复的NAT规则
+    cleanup_duplicate_nat_rules
+    
     # 清理 filter 表规则但保持基本策略
     iptables -P INPUT ACCEPT 2>/dev/null || true
     iptables -P FORWARD ACCEPT 2>/dev/null || true
@@ -735,7 +806,7 @@ cleanup_firewalls() {
     # 清理自定义链
     iptables -X 2>/dev/null || true
     
-    success "防火墙清理完成（NAT 规则已保留）"
+    success "防火墙清理完成"
 }
 
 # 设置 SSH 保护
@@ -845,7 +916,7 @@ save_iptables_rules() {
             
             cat > /etc/systemd/system/iptables-restore.service << 'EOF'
 [Unit]
-Description=恢复 iptables 规则
+Description=Restore iptables rules
 Before=network-pre.target
 Wants=network-pre.target
 
