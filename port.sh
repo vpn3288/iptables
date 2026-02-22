@@ -255,9 +255,8 @@ detect_existing_hop_rules() {
     while IFS= read -r line; do
         [[ "$line" =~ DNAT ]] || continue
         local range target
-        range=$(echo "$line" | grep -oE 'dpts:[0-9]+:[0-9]+' | tr ':' '-' | sed 's/^-//')
         range=$(echo "$line" | grep -oE 'dpts:[0-9]+:[0-9]+' | grep -oE '[0-9]+:[0-9]+' | tr ':' '-')
-        target=$(echo "$line" | grep -oE 'to::[0-9]+' | grep -oE '[0-9]+')
+        target=$(echo "$line" | grep -oE 'to::[0-9]+' | grep -oE '[0-9]+$')
         if [[ -n "$range" && -n "$target" ]]; then
             local rule="${range}->${target}"
             [[ " ${HOP_RULES[*]} " =~ " $rule " ]] || HOP_RULES+=("$rule")
@@ -368,15 +367,14 @@ apply_rules() {
     iptables -A FORWARD -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
     iptables -A FORWARD -m conntrack --ctstate DNAT -j ACCEPT
 
-    # 端口跳跃规则
+    # 端口跳跃规则（格式: "16820-16999->16801"）
     for rule in "${HOP_RULES[@]}"; do
-        local range target
-        range=$(echo "$rule" | cut -d'>' -f1 | tr -d '->' )
-        # 正确解析 "start-end->target"
-        local start_p end_p
-        start_p=$(echo "$rule" | grep -oE '^[0-9]+')
-        end_p=$(echo "$rule"   | grep -oE '^[0-9]+-[0-9]+' | cut -d- -f2)
-        target=$(echo "$rule"  | grep -oE '[0-9]+$')
+        # 用 awk 安全解析，避免 bash 特殊字符问题
+        local start_p end_p target
+        start_p=$(echo "$rule" | awk -F'[-]' '{print $1}')
+        end_p=$(echo "$rule"   | awk -F'[-]' '{print $2}' | awk -F'->' '{print $1}')
+        target=$(echo "$rule"  | awk -F'->' '{print $2}')
+        [[ -n "$start_p" && -n "$end_p" && -n "$target" ]] || continue
         apply_single_hop "$start_p" "$end_p" "$target"
     done
 
@@ -478,9 +476,9 @@ show_summary() {
         echo -e "${C}端口跳跃   :${W}"
         for r in "${HOP_RULES[@]}"; do
             local s e t
-            s=$(echo "$r" | grep -oE '^[0-9]+')
-            e=$(echo "$r" | grep -oE '^[0-9]+-[0-9]+' | cut -d- -f2)
-            t=$(echo "$r" | grep -oE '[0-9]+$')
+            s=$(echo "$r" | awk -F'[-]' '{print $1}')
+            e=$(echo "$r" | awk -F'[-]' '{print $2}' | awk -F'->' '{print $1}')
+            t=$(echo "$r" | awk -F'->' '{print $2}')
             echo -e "  ${G}•${W} ${s}-${e} → ${t}"
         done
     fi
