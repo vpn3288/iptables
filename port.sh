@@ -143,16 +143,73 @@ detect_hysteria_hop() {
 detect_ports() {
     info "扫描公网监听端口..."
 
-    # 第一步：ss 扫描（已过滤 localhost + 系统进程 + 临时端口）
+    # ── ss 扫描（最可靠，实际监听状态）──────────────────────
     while read -r port; do
         add_port "$port"
     done < <(get_public_ports)
 
-    # 第二步：233boy xray 从文件名补充
-    # 只补充 ss 里已经有公网监听的端口（避免加入未运行的内部端口）
-    local public_ports_str
-    public_ports_str=$(get_public_ports | tr '\n' ' ')
+    # ── 配置文件补充（覆盖未运行节点的端口）─────────────────
+    # 用 python3 解析 JSON，正确过滤 listen=127.x 内部端口
+    # 支持: xray/v2ray/sing-box/hiddify/3x-ui 等所有主流格式
+    local py_parser="/tmp/_fw_parse_ports.py"
+    cat > "$py_parser" << 'PYEOF'
+import json, sys
 
+def extract_ports(data):
+    ports = []
+    LOCAL = ('127.', '::1', 'localhost')
+    def is_local(v):
+        return any(str(v or '').startswith(x) for x in LOCAL)
+    # xray/v2ray/sing-box: inbounds[]
+    for inb in (data.get('inbounds') or []):
+        if not isinstance(inb, dict): continue
+        for key in ('port', 'listen_port'):
+            p = inb.get(key)
+            if isinstance(p, int) and 1 <= p <= 65535 and not is_local(inb.get('listen','')):
+                ports.append(p)
+    # v2ray 旧格式: inbound + inboundDetour[]
+    for src in [data.get('inbound')] + list(data.get('inboundDetour') or []):
+        if not isinstance(src, dict): continue
+        p = src.get('port')
+        if isinstance(p, int) and 1 <= p <= 65535 and not is_local(src.get('listen','')):
+            ports.append(p)
+    return sorted(set(ports))
+
+for f in sys.argv[1:]:
+    try:
+        with open(f) as fp:
+            data = json.load(fp)
+        for p in extract_ports(data):
+            print(p)
+    except Exception:
+        pass
+PYEOF
+
+    # 收集所有配置文件
+    local cfg_files=()
+    local cfg_dirs=(
+        /usr/local/etc/xray /etc/xray
+        /usr/local/etc/v2ray /etc/v2ray
+        /etc/sing-box /opt/sing-box /usr/local/etc/sing-box
+        /etc/hysteria /etc/hysteria2
+        /etc/tuic /etc/trojan
+        /etc/x-ui /opt/3x-ui/bin /usr/local/x-ui/bin
+    )
+    for d in "${cfg_dirs[@]}"; do
+        [[ -d "$d" ]] || continue
+        for f in "$d"/config.json "$d"/*.json "$d"/conf/*.json "$d"/confs/*.json; do
+            [[ -f "$f" ]] && cfg_files+=("$f")
+        done
+    done
+
+    if [[ ${#cfg_files[@]} -gt 0 ]]; then
+        while read -r port; do
+            add_port "$port"
+        done < <(python3 "$py_parser" "${cfg_files[@]}" 2>/dev/null | sort -un || true)
+    fi
+
+    # ── 233boy 文件名端口（兜底，不依赖 python3）────────────
+    # 文件名格式: VLESS-Reality-12503.json，末尾数字即端口
     local conf_dirs=(/etc/xray/conf /etc/xray/confs /usr/local/etc/xray/conf /usr/local/etc/xray/confs)
     for d in "${conf_dirs[@]}"; do
         [[ -d "$d" ]] || continue
@@ -161,11 +218,11 @@ detect_ports() {
             local fname_port
             fname_port=$(basename "$f" | grep -oE '[0-9]+\.json$' | grep -oE '[0-9]+')
             [[ -z "$fname_port" ]] && continue
-            # 验证：该端口必须在 ss 公网监听列表里（ss 已过滤 localhost）
-            [[ " $public_ports_str " =~ " $fname_port " ]] && add_port "$fname_port" || true
+            add_port "$fname_port"
         done
     done
 }
+
 
 apply_hop() {
     local s=$1 e=$2 t=$3
