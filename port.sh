@@ -203,27 +203,49 @@ detect_listening_ports() {
 
 # ── 扫描配置文件端口（不受 32768 限制）───────────────────────
 detect_config_ports() {
+    # ── 固定配置文件路径 ──────────────────────────────────────
     local configs=(
-        /etc/x-ui/config.json
-        /opt/3x-ui/bin/config.json
-        /usr/local/x-ui/bin/config.json
         /usr/local/etc/xray/config.json  /etc/xray/config.json
         /usr/local/etc/v2ray/config.json /etc/v2ray/config.json
+        /etc/x-ui/config.json            /opt/3x-ui/bin/config.json
+        /usr/local/x-ui/bin/config.json
         /etc/sing-box/config.json        /opt/sing-box/config.json
         /usr/local/etc/sing-box/config.json
         /etc/hysteria/config.json        /etc/hysteria2/config.json
         /etc/tuic/config.json            /etc/trojan/config.json
         /opt/hiddify-manager/.env
     )
+
+    # ── 233boy xray：扫描 conf 目录下所有 JSON ────────────────
+    # 文件名格式: VLESS-Reality-12503.json，末尾数字即端口
+    local conf_dirs=(/etc/xray/conf /etc/xray/confs /usr/local/etc/xray/conf /usr/local/etc/xray/confs)
+    for d in "${conf_dirs[@]}"; do
+        [[ -d "$d" ]] || continue
+        for f in "$d"/*.json; do
+            [[ -f "$f" ]] || continue
+            configs+=("$f")
+            # 从文件名直接提取端口（233boy 命名规则）
+            local fname_port
+            fname_port=$(basename "$f" | grep -oE '[0-9]+\.json$' | grep -oE '[0-9]+')
+            if [[ -n "$fname_port" ]]; then
+                [[ "$fname_port" -ge 1 && "$fname_port" -le 65535 ]] || continue
+                is_blacklisted "$fname_port"                  && continue
+                port_in_hop_range "$fname_port"              && continue
+                [[ " ${OPEN_PORTS[*]} " =~ " $fname_port " ]] && continue
+                OPEN_PORTS+=("$fname_port")
+            fi
+        done
+    done
+
+    # ── 提取所有配置文件中的 "port": 数字 ────────────────────
     for f in "${configs[@]}"; do
         [[ -f "$f" ]] || continue
         while read -r port; do
-            # 配置文件里的端口无论大小都加入（用户明确配置的）
-            [[ "$port" =~ ^[0-9]+$ ]]             || continue
-            [[ "$port" -ge 1 && "$port" -le 65535 ]] || continue
-            is_blacklisted "$port"                 && continue
-            port_in_hop_range "$port"             && continue
-            [[ " ${OPEN_PORTS[*]} " =~ " $port " ]] && continue
+            [[ "$port" =~ ^[0-9]+$ ]]                 || continue
+            [[ "$port" -ge 1 && "$port" -le 65535 ]]  || continue
+            is_blacklisted "$port"                     && continue
+            port_in_hop_range "$port"                 && continue
+            [[ " ${OPEN_PORTS[*]} " =~ " $port " ]]   && continue
             OPEN_PORTS+=("$port")
         done < <(grep -oE '"port"\s*:\s*[0-9]+' "$f" 2>/dev/null \
             | grep -oE '[0-9]+' | sort -un)
