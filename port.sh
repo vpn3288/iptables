@@ -238,6 +238,7 @@ detect_config_ports() {
     done
 
     # ── 提取所有配置文件中的 "port": 数字 ────────────────────
+    # 过滤掉 listen 在 127.x 的 inbound（内部端口）
     for f in "${configs[@]}"; do
         [[ -f "$f" ]] || continue
         while read -r port; do
@@ -246,9 +247,17 @@ detect_config_ports() {
             is_blacklisted "$port"                     && continue
             port_in_hop_range "$port"                 && continue
             [[ " ${OPEN_PORTS[*]} " =~ " $port " ]]   && continue
+            # 只检查同一行的 listen 地址，避免跨 inbound 误判
+            local the_line listen_addr
+            the_line=$(grep ""port"[[:space:]]*:[[:space:]]*${port}[^0-9]" "$f" 2>/dev/null | head -1)
+            listen_addr=$(echo "$the_line" | grep -oE '"listen"[[:space:]]*:[[:space:]]*"[^"]*"' \
+                | grep -oE '"[0-9a-f.:]*"$' | tr -d '"')
+            # 若明确绑定在 127.x 或 ::1，跳过
+            if [[ -n "$listen_addr" ]]; then
+                [[ "$listen_addr" == 127.* || "$listen_addr" == "::1" ]] && continue
+            fi
             OPEN_PORTS+=("$port")
-        done < <(grep -oE '"port"\s*:\s*[0-9]+' "$f" 2>/dev/null \
-            | grep -oE '[0-9]+' | sort -un)
+        done < <(grep -oE '"port"\s*:\s*[0-9]+' "$f" 2>/dev/null             | grep -oE '[0-9]+' | sort -un)
     done
 }
 
