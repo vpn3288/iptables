@@ -19,7 +19,7 @@ hr()   { echo -e "${B}───────────────────�
 SSH_PORT=""
 OPEN_PORTS=()
 HOP_RULES=()
-VERSION="3.3"
+VERSION="3.4"
 DRY_RUN=false
 _status=0 _reset=0 _addhop=0
 
