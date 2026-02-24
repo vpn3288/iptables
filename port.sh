@@ -5,7 +5,7 @@
 #       Hysteria2 端口跳跃 / fscarhem / v2ray-agent
 # 使用: bash <(curl -sSL https://raw.githubusercontent.com/vpn3288/iptables/refs/heads/main/port.sh)
 # ============================================================
-set -euo pipefail
+set -uo pipefail
 
 R="\033[31m" Y="\033[33m" G="\033[32m" C="\033[36m" B="\033[34m" W="\033[0m"
 ok()   { echo -e "${G}✓ $*${W}"; }
@@ -49,18 +49,18 @@ done
 EXCLUDE_PROCS="cloudflared|chronyd|dnsmasq|systemd.resolve|named|unbound|ntpd|avahi"
 
 get_public_ports() {
-    # 排除 localhost 绑定 + 排除非代理进程 + 只取公网绑定端口
+    # 只取公网绑定端口，排除 localhost + 系统进程 + 临时端口(>=32768)
     ss -tulnp 2>/dev/null \
         | grep -vE '(127\.|::1)' \
         | grep -vE "($EXCLUDE_PROCS)" \
         | grep -oE '(\*|0\.0\.0\.0|\[?::\]?):[0-9]+' \
         | grep -oE '[0-9]+$' \
         | grep -v '^1$' \
+        | sort -un \
         | while read -r p; do
-            # 只保留端口 < 32768（32768+ 是系统临时端口范围）
-            [[ "$p" -lt 32768 ]] && echo "$p"
-        done \
-        | sort -un
+            # 用 if 而非 && ，避免 set -e 把条件为假误判为错误
+            if [[ "$p" -lt 32768 ]]; then echo "$p"; fi
+        done || true
 }
 
 # ── 安装依赖 + 系统隐蔽优化 ─────────────────────────────────
@@ -159,7 +159,7 @@ detect_existing_hop_rules() {
             local rule="${range}->${target}"
             [[ " ${HOP_RULES[*]} " =~ " ${rule} " ]] || HOP_RULES+=("$rule")
         fi
-    done < <(iptables -t nat -L PREROUTING -n 2>/dev/null)
+    done < <(iptables -t nat -L PREROUTING -n 2>/dev/null || true)
 }
 
 # ── 从 Hysteria2 配置文件检测跳跃 ───────────────────────────
@@ -198,7 +198,7 @@ detect_listening_ports() {
     info "扫描公网监听端口（过滤 localhost/系统进程/临时端口）..."
     while read -r port; do
         add_port "$port"
-    done < <(get_public_ports)
+    done < <(get_public_ports || true)
 }
 
 # ── 扫描配置文件端口（不受 32768 限制）───────────────────────
@@ -390,7 +390,7 @@ show_status() {
         r=$(echo "$line" | grep -oE 'dpts:[0-9]+:[0-9]+' | grep -oE '[0-9]+:[0-9]+')
         t=$(echo "$line" | grep -oE 'to::[0-9]+' | grep -oE '[0-9]+$')
         [[ -n "$r" && -n "$t" ]] && echo "  • ${r//:/-} → :${t}" && has_nat=1
-    done < <(iptables -t nat -L PREROUTING -n 2>/dev/null)
+    done < <(iptables -t nat -L PREROUTING -n 2>/dev/null || true)
     [[ $has_nat -eq 0 ]] && echo "  无"
 
     echo -e "\n${G}▸ 公网监听端口 (ss):${W}"
@@ -489,7 +489,7 @@ main() {
     add_port 443
 
     if [[ ${#OPEN_PORTS[@]} -gt 0 ]]; then
-        mapfile -t OPEN_PORTS < <(printf '%s\n' "${OPEN_PORTS[@]}" | sort -un)
+        mapfile -t OPEN_PORTS < <(printf '%s\n' "${OPEN_PORTS[@]}" | sort -un) || true
     fi
 
     echo
