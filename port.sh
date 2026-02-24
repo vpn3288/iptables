@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-# 代理节点防火墙自动管理脚本 v3.3
+# 代理节点防火墙自动管理脚本 v3.4
 # 支持: Hiddify / 3X-UI / X-UI / Sing-box / Xray / V2Ray
 #       Hysteria2 端口跳跃 / fscarhem / v2ray-agent
 # 使用: bash <(curl -sSL https://raw.githubusercontent.com/vpn3288/iptables/refs/heads/main/port.sh)
