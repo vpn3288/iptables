@@ -17,21 +17,6 @@ bash <(curl -sSL https://raw.githubusercontent.com/vpn3288/iptables/refs/heads/m
 
 > 代理节点专用 iptables 防火墙脚本。自动扫描代理软件监听端口并配置规则，支持端口跳跃、SSH 防暴力破解、规则持久化，与 BBRplus 和 youhua.sh 完全兼容。
 
----
-
-## 一键安装
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/port.sh)
-```
-
-**预览模式（只显示检测结果，不实际修改规则）：**
-
-```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/YOUR_USER/YOUR_REPO/main/port.sh) --dry-run
-```
-
----
 
 ## 兼容性
 
