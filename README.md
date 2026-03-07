@@ -1,4 +1,8 @@
-# port.sh
+### 一键运行（推荐）
+
+```bash
+bash <(curl -sSL https://raw.githubusercontent.com/vpn3288/iptables/refs/heads/main/port.sh)
+```
 
 **代理节点 iptables 防火墙一键管理脚本** · v4.4
 
