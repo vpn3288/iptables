@@ -70,7 +70,7 @@
 
 ```bash
 # 下载
-wget -O port.sh https://raw.githubusercontent.com/your-repo/port.sh/main/port.sh
+wget -O port.sh https://raw.githubusercontent.com/vpn3288/iptables/refs/heads/main/port.sh
 
 # 一键配置（自动检测所有端口并应用规则）
 bash port.sh
